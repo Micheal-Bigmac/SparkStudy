@@ -1,1 +1,126 @@
 
+
+
+学习博客 ： http://homepage.cs.latrobe.edu.au/zhe/ZhenHeSparkRDDAPIExamples.html
+
+
+Spark内部提供了HashPartitioner和RangePartitioner两种分区策略
+
+
+cartesian  对两个RDD 的每个元素 进行笛卡儿积操作
+checkpoint 建议在执行checkpoint()方法之前先对rdd进行persisted操作。 因为checkpoint会触发一个Job,如果执行checkpoint的rdd是由其他rdd经过许多计算转换过来的，如果你没有persisted这个rdd，那么又要重头开始计算该rdd，也就是做了重复的计算工作了，所以建议先persist rdd然后再checkpoint，checkpoint会丢弃该rdd的以前的依赖关系，使该rdd成为顶层父rdd，这样在失败的时候恢复只需要恢复该rdd,而不需要重新计算该rdd了，这在迭代计算中是很有用的
+
+coalesce, repartition
+
+他们两个都是RDD的分区进行重新划分，repartition只是coalesce接口中shuffle为true的简易实现
+
+    1）、N<M。一般情况下N个分区有数据分布不均匀的状况，利用HashPartitioner函数将数据重新分区为M个，这时需要将shuffle设置为true。
+
+    2）如果N>M并且N和M相差不多，(假如N是1000，M是100)那么就可以将N个分区中的若干个分区合并成一个新的分区，最终合并为M个分区，这时可以将shuff设置为false，在shuffl为false的情况下，如果M>N时，coalesce为无效的，不进行shuffle过程，父RDD和子RDD之间是窄依赖关系。
+
+    3）如果N>M并且两者相差悬殊，这时如果将shuffle设置为false，父子ＲＤＤ是窄依赖关系，他们同处在一个Ｓｔａｇｅ中，就可能造成Spark程序的并行度不够，从而影响性能，如果在M为1的时候，为了使coalesce之前的操作有更好的并行度，可以讲shuffle设置为true。
+
+总之：如果shuff为false时，如果传入的参数大于现有的分区数目，RDD的分区数不变，也就是说不经过shuffle，是无法将RDDde分区数变多的。
+
+foldByKey()与fold()操作类似   foldByKey 是安装key 进行 操作 foldBykey 设置一个初始值 foldbykey 对应的是tuple fold 对应的是单个元素
+
+
+cogroup 是把两个RDD 相同的key 弄成一个 RDD value 为相同key 的集合 Iterator 同一个RDD 相同的Value 会连成一起
+
+collect  toArray
+collect相当于toArray，toArray已经过时不推荐使用 collect将分布式的RDD返回为一个单机的scala Array数组
+
+collectAsMap  collectAsMap对（K，V）型的RDD数据返回一个单机HashMap。对于重复K的RDD元素，后面的元素覆盖前面的元素
+
+
+
+combineByKey[Pair]   这个函数是对tuple 类型数据的value 进行操作 类似于 reduceByKey 但是性能较高 推荐使用
+
+countByKey [Pair]针对二元组每个unique的key进行count
+
+countByValue 返回unique的value所对应的个数。相对应countByKey
+
+countApproxDistinct 快速计算count，但不精确。relativeSD控制精度  在指定的时间内计算出结果，即使没有计算完
+
+distinct 针对RDD中的数据进行去重
+
+
+filterByRange [Ordered] 对满足条件的key 进行过滤
+
+flatMap 先进行map 操作 然后合并在一起 对RDD每个元素转换, 然后再扁平化（即将所有对象合并为一个对象）
+
+flatMapValues  这个还不是很懂 没太明白
+方法要求value是TraversableOnce类型的，输出结果会把TraversableOnce中的元素打散输出多个tuple出来。
+
+fold  聚合每个数据分片的数据。每个数据分片聚合之前可以设置一个初始值zeroValue
+
+foldByKey [Pair] 功能类似fold，区别在于聚合范围不再是数据分别，而是每个key。输入的RDD数据必须是包含两个元素的tuple。
+
+foreachPartition 针对每个数据分片执行当前输入的无参数方法，每个分片的数据元素通过迭代器访问。
+
+
+
+
+leftOuterJoin leftOuterJoin类似于SQL中的左外关联left outer join，返回结果以前面的RDD为主，关联不上的记录为空。只能用于两个RDD之间的关联
+
+ flullOuterJoin 两个表的join结果，左边在右边中没找到的结果（NULL），右边在左边没找到的结果
+
+  rightOuterJoin类似于SQL中的有外关联right outer join，返回结果以参数中的RDD为主，关联不上的记录为空
+
+  subtract 针对K的 返回在主RDD中出现，并且不在otherRDD中出现的元素
+
+
+  groupby 按照自己条件进行分组 仅仅将数据分组，分组的key通过传入的函数生成
+
+  groupByKey [Pair]  相比较于groupBy, groupByKey不需要传入生成key的函数，而仅将输入二元tuple中的第一个字段当成key进行分组。
+
+   keyBy 按照给定的方法 进行分组 groupByKey 对 pair 类型数据 的key 进行分组 性能不好 建议使用aggrentBykey
+
+id 查询分配给RDD的id号
+
+intersection 取两个RDD的交集
+join [Pair]  对两个key-value的RDD执行内连接
+
+lookup 遍历RDD中所有的key，找到符合输入key的value，并输出scala的seq数据
+
+ map  针对RDD中的每个数据元素执行map函数，并返回处理后的新RDD。
+
+ mapPartitionsWithContext 能类似于mapPartitions，但是处理函数会带有当前节点的相关信息。
+
+ mapValues 是对value 进行函数操作
+
+ mean   平均值
+
+ partitionBy [Pair] 将数据重新分片
+
+persist, cache      persist()和cache()是persist(StorageLevel.MEMORY_ONLY)的缩写。
+ 一旦存储等级被改变，则它不能被再次改变！
+
+ pipe  将RDD的每个数据分片都接到shell-command的标准输入上。经过shell-command的输出数据会重新生成新的RDD，新RDD是string类型的RDD。
+
+ randomSplit  数据集切分方法。随机将RDD的数据切分到多个小RDD中。切分比率由输入的权重Array确定。切分不会严格和输入的比率相同，同时也可以设定随机seed
+
+ sample 随机取样  sampleByKey [Pair]
+repartitionAndSortWithinPartitions  按照指定的分区分区 并且按照 key  进行排序 partitioner对RDD进行分区，并且在每个结果分区中按key进行排序；通过对比sortByKey发现，这种方式比先分区，然后在每个分区中进行排序效率高，这是因为它可以将排序融入到shuffle阶段
+sortByKey 按照key 进行排序 
+
+
+sortByKey [Ordered] 这个方法按Key进行排序，并输出新RDD。输出的RDD数据是经过shuffled之后的，因为在在输出的reducer里数据已经被shuffle了。
+
+take 将RDD中前n个数据单元抽取出来作为array返回
+takeOrdered 用RDD数据单元本身隐含的排序方法进行排序，排序后返回前n个元素组成的array
+
+union 执行集合合并操作
+
+unpersist  释放RDD，将存入磁盘和内存的数据元素释放。但是RDD对象会被保留，在后续使用它的时候，Spark会重新依据依赖图计算。
+
+values 抽取所有tuple中的value并组装成新的RDD返回。
+
+zip 将两个RDD中第i个元素组成一个tuple，进而形成(key-value)的PairRDD。
+
+values 抽取所有tuple中的value并组装成新的RDD返回
+
+zipParititions 功能与zip相近，但是可以对zip过程提供更多的控制
+
+
+代码
